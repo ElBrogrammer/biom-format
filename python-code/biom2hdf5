@@ -14,11 +14,19 @@ import sys
 import h5py
 import numpy
 
-def parse_field(table_str, field):
+def parse_field(table_str, field, required=True):
     search_str = '"%s": "' % field
-    start_idx = table_str.index(search_str) + len(search_str)
-    end_idx = table_str.index('",', start_idx)
-    return table_str[start_idx:end_idx]
+
+    try:
+        start_idx = table_str.index(search_str) + len(search_str)
+    except ValueError:
+        if required:
+            raise ValueError("Missing required field '%s'." % field)
+        else:
+            return None
+    else:
+        end_idx = table_str.index('",', start_idx)
+        return table_str[start_idx:end_idx]
 
 def parse_shape(table_str):
     search_str = '"shape": ['
@@ -27,34 +35,6 @@ def parse_shape(table_str):
     dim_strs = table_str[start_idx:end_idx].split(', ')
     assert len(dim_strs) == 2
     return tuple(map(int, dim_strs))
-
-def parse_data_row(table_str, shape):
-    search_str = '"data": [['
-    start_idx = table_str.index(search_str) + len(search_str)
-
-    current_row_idx = 0
-    eof = False
-    while current_row_idx < shape[0]:
-        current_row_data = numpy.zeros(shape[1])
-
-        while not eof:
-            end_idx = table_str.index(']', start_idx)
-            data_strs = table_str[start_idx:end_idx].split(',')
-            #assert len(data_strs) == 3
-            row_idx, col_idx, data = int(data_strs[0]), int(data_strs[1]), float(data_strs[2])
-
-            if row_idx == current_row_idx:
-                current_row_data[col_idx] = data
-
-                if table_str[end_idx + 1] == ',':
-                    start_idx = end_idx + 3
-                else:
-                    eof = True
-            else:
-                break
-
-        yield current_row_data
-        current_row_idx += 1
 
 def parse_data(table_str):
     search_str = '"data": [['
@@ -65,6 +45,21 @@ def parse_data(table_str):
         data_strs = table_str[start_idx:end_idx].split(',')
         assert len(data_strs) == 3
         yield int(data_strs[0]), int(data_strs[1]), float(data_strs[2])
+
+        if table_str[end_idx + 1] == ',':
+            start_idx = end_idx + 3
+        else:
+            break
+
+def parse_metadata(table_str, axis):
+    search_str = '"%s": [{' % axis
+    start_idx = table_str.index(search_str) + len(search_str)
+
+    while True:
+        end_idx = table_str.index('}', start_idx)
+        fields = table_str[start_idx:end_idx].split(', ')
+        assert len(fields) == 2
+        yield fields[0].split('"id": "')[1][:-1]
 
         if table_str[end_idx + 1] == ',':
             start_idx = end_idx + 3
@@ -84,8 +79,11 @@ generated_by = parse_field(table_str, 'generated_by')
 date = parse_field(table_str, 'date')
 matrix_type = parse_field(table_str, 'matrix_type')
 matrix_element_type = parse_field(table_str, 'matrix_element_type')
+comment = parse_field(table_str, 'comment', required=False)
 shape = parse_shape(table_str)
 data = parse_data(table_str)
+obs_ids = list(parse_metadata(table_str, 'rows'))
+sample_ids = list(parse_metadata(table_str, 'columns'))
 
 print table_id
 print version
@@ -95,50 +93,52 @@ print generated_by
 print date
 print matrix_type
 print matrix_element_type
+print comment
 print shape
 
-print "Creating HDF5 file"
+print "Creating HDF5 file...",
 out_f = h5py.File(out_fp, 'w')
-print "Done creating HDF5 file"
+print "Done"
 
-print "Creating dataset"
-dset = out_f.create_dataset('data', shape, dtype=matrix_element_type,
-                            compression='gzip')
-#dset = out_f.create_dataset('data', shape, dtype=matrix_element_type)
-print "Done creating dataset"
+print "Creating dataset...",
+#dset = out_f.create_dataset('data', shape, dtype=matrix_element_type,
+#                            compression='gzip')
+dset = out_f.create_dataset('data', shape, dtype=matrix_element_type)
+print "Done"
 
+print "Populating top-level metadata fields...",
+out_f.attrs['id'] = table_id
+out_f.attrs['format'] = version
+out_f.attrs['format_url'] = url
+out_f.attrs['type'] = table_type
+out_f.attrs['generated_by'] = generated_by
+out_f.attrs['date'] = date
+out_f.attrs['matrix_type'] = matrix_type
+out_f.attrs['matrix_element_type'] = matrix_element_type
+if comment is not None:
+    out_f.attrs['comment'] = comment
+out_f.attrs['shape'] = shape
+print "Done"
+
+print "Writing data...",
 count = 0
 for e in data:
     dset[e[0], e[1]] = e[2]
     count += 1
 
     if (count % 100000) == 0:
-        print "flushing, NNZ processed: %d" % count
+        print "Flushing, NNZ processed: %d..." % count,
         out_f.flush()
-        print "done flushing"
+        print "Done"
+out_f.flush()
+print "Done"
 
-print
-print dset[0, 0]
-print dset[0, 1]
-print dset[999, 999]
+print "NNZ: %d" % count
+print "Table density: %r" % (count / (shape[0] * shape[1]))
 
-#row_idx = 0
-#for row in data:
-#    #dset[e[0], e[1]] = e[2]
-#    dset[row_idx] = row
-#    row_idx += 1
-#
-#    if (row_idx % 10000) == 0:
-#        print "flushing, row %d" % row_idx
-#        out_f.flush()
-#        print "done flushing"
-
-# 107,439,386
-#print "NNZ: %d" % count
-
-#print
-#print dset[0, 0]
-#print dset[0, 1]
-#print dset[5594412, 15480]
+print "Populating metadata...",
+out_f['rows'] = obs_ids
+out_f['columns'] = sample_ids
+print "Done"
 
 out_f.close()
