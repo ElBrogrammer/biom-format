@@ -101,9 +101,9 @@ out_f = h5py.File(out_fp, 'w')
 print "Done"
 
 print "Creating dataset...",
-#dset = out_f.create_dataset('data', shape, dtype=matrix_element_type,
-#                            compression='gzip')
-dset = out_f.create_dataset('data', shape, dtype=matrix_element_type)
+dset = out_f.create_dataset('data', shape, dtype=matrix_element_type,
+                            compression='gzip')
+#dset = out_f.create_dataset('data', shape, dtype=matrix_element_type)
 print "Done"
 
 print "Populating top-level metadata fields...",
@@ -139,6 +139,12 @@ print "Table density: %r" % (count / (shape[0] * shape[1]))
 print "Populating metadata...",
 out_f['rows'] = obs_ids
 out_f['columns'] = sample_ids
+dset.dims[0].label = 'observations'
+dset.dims[1].label = 'samples'
+dset.dims.create_scale(out_f['rows'], 'ids')
+dset.dims.create_scale(out_f['columns'], 'ids')
+dset.dims[0].attach_scale(out_f['rows'])
+dset.dims[1].attach_scale(out_f['columns'])
 print "Done"
 
 out_f.close()
