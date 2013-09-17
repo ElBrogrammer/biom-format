@@ -66,7 +66,7 @@ def parse_metadata(table_str, axis):
         else:
             break
 
-in_fp, out_fp = sys.argv[1:]
+in_fp, out_fp, mode = sys.argv[1:]
 in_f = open(in_fp, 'U')
 table_str = in_f.read()
 in_f.close()
@@ -100,12 +100,6 @@ print "Creating HDF5 file...",
 out_f = h5py.File(out_fp, 'w')
 print "Done"
 
-print "Creating dataset...",
-dset = out_f.create_dataset('data', shape, dtype=matrix_element_type,
-                            compression='gzip')
-#dset = out_f.create_dataset('data', shape, dtype=matrix_element_type)
-print "Done"
-
 print "Populating top-level metadata fields...",
 out_f.attrs['id'] = table_id
 out_f.attrs['format'] = version
@@ -120,31 +114,58 @@ if comment is not None:
 out_f.attrs['shape'] = shape
 print "Done"
 
-print "Writing data...",
-count = 0
-for e in data:
-    dset[e[0], e[1]] = e[2]
-    count += 1
+if mode == 'dense':
+    print "Creating dataset...",
+    dset = out_f.create_dataset('data', shape, dtype=matrix_element_type,
+                                compression='gzip')
+    #dset = out_f.create_dataset('data', shape, dtype=matrix_element_type)
+    print "Done"
 
-    if (count % 100000) == 0:
-        print "Flushing, NNZ processed: %d..." % count,
-        out_f.flush()
-        print "Done"
-out_f.flush()
-print "Done"
+    print "Writing data...",
+    count = 0
+    for e in data:
+        dset[e[0], e[1]] = e[2]
+        count += 1
+
+        if (count % 100000) == 0:
+            print "Flushing, NNZ processed: %d..." % count,
+            out_f.flush()
+            print "Done"
+    out_f.flush()
+    print "Done"
+
+    print "Populating metadata...",
+    out_f['rows'] = obs_ids
+    out_f['columns'] = sample_ids
+    dset.dims[0].label = 'observations'
+    dset.dims[1].label = 'samples'
+    dset.dims.create_scale(out_f['rows'], 'ids')
+    dset.dims.create_scale(out_f['columns'], 'ids')
+    dset.dims[0].attach_scale(out_f['rows'])
+    dset.dims[1].attach_scale(out_f['columns'])
+    print "Done"
+elif mode == 'sparse':
+    print "Collecting nonzero entries in memory...",
+    count = 0
+    nonzeros = []
+    for e in data:
+        nonzeros.append(e)
+        count += 1
+    print "Done"
+
+    print "Creating dataset...",
+    dset = out_f.create_dataset('data', data=nonzeros)
+    #dset = out_f.create_dataset('data', data=nonzeros, compression='gzip')
+    print "Done"
+
+    print "Populating metadata...",
+    out_f['rows'] = obs_ids
+    out_f['columns'] = sample_ids
+    print "Done"
+else:
+    raise ValueError
 
 print "NNZ: %d" % count
 print "Table density: %r" % (count / (shape[0] * shape[1]))
-
-print "Populating metadata...",
-out_f['rows'] = obs_ids
-out_f['columns'] = sample_ids
-dset.dims[0].label = 'observations'
-dset.dims[1].label = 'samples'
-dset.dims.create_scale(out_f['rows'], 'ids')
-dset.dims.create_scale(out_f['columns'], 'ids')
-dset.dims[0].attach_scale(out_f['rows'])
-dset.dims[1].attach_scale(out_f['columns'])
-print "Done"
 
 out_f.close()
