@@ -43,7 +43,7 @@ def parse_data(table_str):
     while True:
         end_idx = table_str.index(']', start_idx)
         data_strs = table_str[start_idx:end_idx].split(',')
-        assert len(data_strs) == 3
+        #assert len(data_strs) == 3
         yield int(data_strs[0]), int(data_strs[1]), float(data_strs[2])
 
         if table_str[end_idx + 1] == ',':
@@ -118,7 +118,6 @@ if mode == 'dense':
     print "Creating dataset...",
     dset = out_f.create_dataset('data', shape, dtype=matrix_element_type,
                                 compression='gzip')
-    #dset = out_f.create_dataset('data', shape, dtype=matrix_element_type)
     print "Done"
 
     print "Writing data...",
@@ -145,27 +144,41 @@ if mode == 'dense':
     dset.dims[1].attach_scale(out_f['columns'])
     print "Done"
 elif mode == 'sparse':
-    print "Collecting nonzero entries in memory...",
-    count = 0
-    nonzeros = []
+    print "Populating metadata...",
+    out_f['rows'] = obs_ids
+    out_f['columns'] = sample_ids
+    out_f.flush()
+    del obs_ids
+    del sample_ids
+    print "Done"
+
+    print "Counting number of nonzero entries...",
+    nnz = 0
     for e in data:
-        nonzeros.append(e)
+        nnz += 1
+    print "Done"
+    print "NNZ: %d" % nnz
+    print "Table density: %r" % (nnz / (shape[0] * shape[1]))
+    data = parse_data(table_str)
+
+    #nnz = 107439386
+
+    print "Loading data into memory...",
+    count = 0
+    nonzeros = numpy.empty((nnz, 3))
+    for e in data:
+        nonzeros[count] = e
         count += 1
+
+        if (count % 100000) == 0:
+            print '%.2f%%' % ((count / nnz) * 100)
     print "Done"
 
     print "Creating dataset...",
     dset = out_f.create_dataset('data', data=nonzeros)
-    #dset = out_f.create_dataset('data', data=nonzeros, compression='gzip')
-    print "Done"
-
-    print "Populating metadata...",
-    out_f['rows'] = obs_ids
-    out_f['columns'] = sample_ids
+    out_f.flush()
     print "Done"
 else:
     raise ValueError
-
-print "NNZ: %d" % count
-print "Table density: %r" % (count / (shape[0] * shape[1]))
 
 out_f.close()
