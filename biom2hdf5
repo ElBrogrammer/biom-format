@@ -165,9 +165,14 @@ elif mode == 'sparse':
 
     print "Loading data into memory...",
     count = 0
-    nonzeros = numpy.empty((nnz, 3))
+    row_data = numpy.empty(nnz)
+    col_data = numpy.empty(nnz)
+    value_data = numpy.empty(nnz)
+
     for e in data:
-        nonzeros[count] = e
+        row_data[count] = e[0]
+        col_data[count] = e[1]
+        value_data[count] = e[2]
         count += 1
 
         if (count % 100000) == 0:
@@ -175,7 +180,10 @@ elif mode == 'sparse':
     print "Done"
 
     print "Creating dataset...",
-    dset = out_f.create_dataset('data', data=nonzeros)
+    data_grp = out_f.create_group('data')
+    data_grp.create_dataset('rows', data=row_data)
+    data_grp.create_dataset('columns', data=col_data)
+    data_grp.create_dataset('values', data=value_data)
     out_f.flush()
     print "Done"
 else:
