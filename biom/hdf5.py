@@ -32,8 +32,6 @@ class Table(object):
     where applicable.
     """
 
-    axis_map = {'sample': 0, 'observation': 1}
-
     @classmethod
     def fromFile(cls, table_fp):
         table_f = h5py.File(table_fp, 'r')
@@ -76,6 +74,14 @@ class Table(object):
         return self.__class__(self._data.transpose(), self.SampleIds[:],
                               self.ObservationIds[:], self.TableId)
 
+    def isEmpty(self):
+        is_empty = False
+
+        if 0 in self.shape:
+            is_empty = True
+
+        return is_empty
+
     def sum(self, axis='whole'):
         if axis == 'whole':
             axis = None
@@ -92,3 +98,30 @@ class Table(object):
             matrix_sum = matrix_sum.reshape(1)
 
         return matrix_sum
+
+    def getTableDensity(self):
+        density = 0.0
+
+        if not self.isEmpty():
+            density = self._data.nnz / (self.shape[0] * self.shape[1])
+
+        return density
+
+    def iterObservationData(self):
+        """SLOW... still slow even when not converting to dense"""
+        self._data = self._data.tocsr()
+
+        for e in self._data:
+            yield e
+
+        #for i in range(self.NumObservations):
+            #vec = self._data.getrow(i)
+            #dense_vec = np.asarray(vec.todense())
+
+            #if vec.shape == (1, 1):
+            #    result = dense_vec.reshape(1)
+            #else:
+            #    result = np.squeeze(dense_vec)
+
+            #yield result
+            #yield vec
