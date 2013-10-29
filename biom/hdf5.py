@@ -20,9 +20,20 @@ __maintainer__ = "Jai Ram Rideout"
 __email__ = "jai.rideout@gmail.com"
 
 import h5py
+import numpy as np
 from scipy.sparse import coo_matrix
+from biom.exception import TableException
 
 class Table(object):
+    """
+
+    Some of the code in this class is taken and modified from other parts of
+    the BIOM project. Credit goes to the contributing authors of that code
+    where applicable.
+    """
+
+    axis_map = {'sample': 0, 'observation': 1}
+
     @classmethod
     def fromFile(cls, table_fp):
         table_f = h5py.File(table_fp, 'r')
@@ -44,3 +55,40 @@ class Table(object):
         self.ObservationIds = ObservationIds
         self.SampleIds = SampleIds
         self.TableId = TableId
+
+    @property
+    def shape(self):
+        return self._data.shape
+
+    @property
+    def NumObservations(self):
+        return self.shape[0]
+
+    @property
+    def NumSamples(self):
+        return self.shape[1]
+
+    @property
+    def T(self):
+        return self.transpose()
+
+    def transpose(self):
+        return self.__class__(self._data.transpose(), self.SampleIds[:],
+                              self.ObservationIds[:], self.TableId)
+
+    def sum(self, axis='whole'):
+        if axis == 'whole':
+            axis = None
+        elif axis == 'sample':
+            axis = 0
+        elif axis == 'observation':
+            axis = 1
+        else:
+            raise TableException("Unrecognized axis '%s'" % axis)
+
+        matrix_sum = np.squeeze(np.asarray(self._data.sum(axis=axis)))
+
+        if axis is not None and matrix_sum.shape == ():
+            matrix_sum = matrix_sum.reshape(1)
+
+        return matrix_sum
