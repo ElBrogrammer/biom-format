@@ -1,42 +1,26 @@
 #!/usr/bin/env python
+
+#-----------------------------------------------------------------------------
+# Copyright (c) 2011-2013, The BIOM Format Development Team.
+#
+# Distributed under the terms of the Modified BSD License.
+#
+# The full license is in the file COPYING.txt, distributed with this software.
+#-----------------------------------------------------------------------------
+
 from __future__ import division
 
 __author__ = "Jai Ram Rideout"
-__copyright__ = "Copyright 2013, BIOM-Format Project"
+__copyright__ = "Copyright 2011-2013, The BIOM Format Development Team"
 __credits__ = ["Jai Ram Rideout"]
-__license__ = "GPL"
+__license__ = "BSD"
 __url__ = "http://biom-format.org"
 __version__ = "1.2.0-dev"
 __maintainer__ = "Jai Ram Rideout"
 __email__ = "jai.rideout@gmail.com"
 
 import sys
-import h5py
-import numpy
-from scipy.sparse import coo_matrix
+from biom.hdf5 import Table
 
 in_fp = sys.argv[1]
-
-print "Opening HDF5 file...",
-biom_f = h5py.File(in_fp, 'r')
-print "Done"
-
-print "Loading observation IDs...",
-obs_ids = biom_f['rows'].value
-print "Done"
-
-print "Loading sample IDs...",
-sample_ids = biom_f['columns'].value
-print "Done"
-
-print "Loading data...",
-data_grp = biom_f['data']
-table = coo_matrix((data_grp['values'].value,
-                    (data_grp['rows'].value, data_grp['columns'].value)),
-                    shape=biom_f.attrs['shape'])
-table = table.tocsr()
-print "Done"
-
-print "Closing HDF5 file...",
-biom_f.close()
-print "Done"
+t = Table.fromFile(in_fp)
