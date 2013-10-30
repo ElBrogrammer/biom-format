@@ -74,6 +74,32 @@ class Table(object):
         return self.__class__(self._data.transpose(), self.SampleIds[:],
                               self.ObservationIds[:], self.TableId)
 
+    def __eq__(self, other):
+        eq = True
+
+        if not isinstance(other, self.__class__):
+            eq = False
+        if self.shape != other.shape:
+            eq = False
+        if (self.ObservationIds != other.ObservationIds).any():
+            eq = False
+        if (self.SampleIds != other.SampleIds).any():
+            eq = False
+        if not self.isEmpty():
+            # Requires scipy >= 0.13.0
+            if (self._data != other._data).nnz > 0:
+                eq = False
+
+        return eq
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __str__(self):
+        return ('BIOM Table with %d observation(s), %d sample(s), and %f '
+                'density' % (self.NumObservations, self.NumSamples,
+                             self.getTableDensity()))
+
     def isEmpty(self):
         is_empty = False
 
@@ -108,23 +134,20 @@ class Table(object):
         return density
 
     def iterObservationData(self):
-        """SLOW... still slow even when not converting to dense"""
+        """SLOW... still very slow even when not converting to dense"""
         self._data = self._data.tocsr()
 
-        for e in self._data:
-            yield e
+        for i in range(self.NumObservations):
+            vec = self._data.getrow(i)
+            dense_vec = np.asarray(vec.todense())
 
-        #for i in range(self.NumObservations):
-            #vec = self._data.getrow(i)
-            #dense_vec = np.asarray(vec.todense())
+            if vec.shape == (1, 1):
+                result = dense_vec.reshape(1)
+            else:
+                result = np.squeeze(dense_vec)
 
-            #if vec.shape == (1, 1):
-            #    result = dense_vec.reshape(1)
-            #else:
-            #    result = np.squeeze(dense_vec)
-
-            #yield result
-            #yield vec
+            yield result
+            yield vec
 
     # For sorting, row/col swapping detailed here may be useful:
     # http://stackoverflow.com/questions/15155276/rearrange-sparse-arrays-by-swapping-rows-and-columns
