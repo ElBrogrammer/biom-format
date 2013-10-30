@@ -129,12 +129,7 @@ class Table(object):
     # For sorting, row/col swapping detailed here may be useful:
     # http://stackoverflow.com/questions/15155276/rearrange-sparse-arrays-by-swapping-rows-and-columns
 
-    def normalize(self):
-        self._data = self._data.tocsr()
-
-        # Requires scipy >= 0.13.0
-        return self._data.multiply(csr_matrix(1. / self._data.sum(1)))
-
+    def normalize(self, axis):
         # Another solution: http://stackoverflow.com/a/12238133
 
         # Could also use sklearn: http://stackoverflow.com/a/12396922
@@ -146,3 +141,18 @@ class Table(object):
         #ccd = spdiags(1./self._data.sum(1).T, 0, *self._data.shape)
         #ccn = ccd * self._data.T
         #return ccn
+
+        if axis == 'sample':
+            sum_axis = 0
+        elif axis == 'observation':
+            sum_axis = 1
+        else:
+            raise TableException("Unrecognized axis '%s'" % axis)
+
+        self._data = self._data.tocsr()
+
+        # Requires scipy >= 0.13.0
+        norm_data = self._data.multiply(
+                csr_matrix(1. / self._data.sum(sum_axis)))
+        return self.__class__(norm_data, self.ObservationIds[:],
+                              self.SampleIds[:], self.TableId)
