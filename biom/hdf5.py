@@ -21,7 +21,7 @@ __email__ = "jai.rideout@gmail.com"
 
 import h5py
 import numpy as np
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csr_matrix, spdiags
 from biom.exception import TableException
 
 class Table(object):
@@ -125,3 +125,23 @@ class Table(object):
 
             #yield result
             #yield vec
+
+    # For sorting, row/col swapping detailed here may be useful:
+    # http://stackoverflow.com/questions/15155276/rearrange-sparse-arrays-by-swapping-rows-and-columns
+
+    def normalize(self):
+        self._data = self._data.tocsr()
+
+        # Requires scipy >= 0.13.0
+        return self._data.multiply(csr_matrix(1. / self._data.sum(1)))
+
+        # Could also use sklearn.preprocessing.normalize:
+        # http://stackoverflow.com/a/12396922
+        #import sklearn.preprocessing
+        #return sklearn.preprocessing.normalize(self._data, axis=1, norm='l1')
+
+        # From http://stackoverflow.com/a/8359856
+        # Only seems to work for square matrices though...
+        #ccd = spdiags(1./self._data.sum(1).T, 0, *self._data.shape)
+        #ccn = ccd * self._data.T
+        #return ccn
