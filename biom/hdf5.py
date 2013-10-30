@@ -135,8 +135,9 @@ class Table(object):
         # Requires scipy >= 0.13.0
         return self._data.multiply(csr_matrix(1. / self._data.sum(1)))
 
-        # Could also use sklearn.preprocessing.normalize:
-        # http://stackoverflow.com/a/12396922
+        # Another solution: http://stackoverflow.com/a/12238133
+
+        # Could also use sklearn: http://stackoverflow.com/a/12396922
         #import sklearn.preprocessing
         #return sklearn.preprocessing.normalize(self._data, axis=1, norm='l1')
 
