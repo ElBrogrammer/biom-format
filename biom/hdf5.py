@@ -19,6 +19,7 @@ __version__ = "1.2.0-dev"
 __maintainer__ = "Jai Ram Rideout"
 __email__ = "jai.rideout@gmail.com"
 
+from itertools import izip
 import h5py
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, spdiags
@@ -98,7 +99,7 @@ class Table(object):
     def __str__(self):
         return ('BIOM Table with %d observation(s), %d sample(s), and %f '
                 'density' % (self.NumObservations, self.NumSamples,
-                             self.getTableDensity()))
+                             self.tableDensity()))
 
     def isEmpty(self):
         is_empty = False
@@ -125,13 +126,16 @@ class Table(object):
 
         return matrix_sum
 
-    def getTableDensity(self):
+    def tableDensity(self):
         density = 0.0
 
         if not self.isEmpty():
             density = self._data.nnz / (self.shape[0] * self.shape[1])
 
         return density
+
+    def nonzero(self):
+        return self._data.nonzero()
 
     def iterObservationData(self):
         """SLOW... still very slow even when not converting to dense"""
